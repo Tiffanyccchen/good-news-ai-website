@@ -36,9 +36,9 @@ if "favorites" not in st.session_state:
     st.session_state.favorites = []
 
 # --- Page Config ---
-st.set_page_config(page_title="Daily Good News", page_icon="🌞", layout="wide")
-st.title("🌞 Daily Good News")
-st.subheader("An automated good news feed, analyzed and categorized by AI created by Yu Ting Chen.")
+st.set_page_config(page_title="Good News Hunter", page_icon="🌞", layout="wide")
+st.title("Good News Hunter")
+st.subheader("AI-curated good news from the world’s whispers. Created by Yu Ting Chen.")
 
 # --- API Key Checks ---
 if not os.getenv("NEWS_API_KEY"):

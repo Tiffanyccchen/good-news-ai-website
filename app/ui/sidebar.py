@@ -9,7 +9,7 @@ def render_sidebar():
     """Renders the sidebar UI and returns user-selected display options."""
     with st.sidebar:
         st.header("Display Options")
-        num_items = st.slider("Articles to show", 10, 100, 50, 10)
+        num_items = st.slider("Articles to show", 100, 500, 300, 50)
         sort_by_option = st.radio(
             "Sort by",
             ["Most Recent", "Most Positive"],
@@ -40,9 +40,9 @@ def render_sidebar():
             "🕒 This feed updates automatically every 15 minutes.It will only retain data for the last 7 days."
         )
         st.info(
-            "🔖 NewsAPI free tier provides data 24 hours late, so stories are from *yesterday*."
+            "🔖 NewsAPI free tier provides data 24 hours late, so the latest stories are from *yesterday*."
         )
-        st.caption("Beta notice: article volume is limited to keep API costs manageable.")
+        st.caption("Beta notice: article volume is limited to maximum 100 per call for free tier users.")
 
         with st.expander("How it Works"):
             st.markdown(
