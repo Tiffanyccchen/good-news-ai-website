@@ -36,10 +36,10 @@ source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
 
 **3. Install Dependencies**
 
-Install all required Python packages using the `requirements.txt` file.
+Install all required Python packages 
 
 ```bash
-pip install -r requirements.txt
+poetry install
 ```
 
 **4. Configure API Keys**
