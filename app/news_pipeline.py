@@ -51,15 +51,29 @@ def get_good_news(
     """
     order_clause = "sentiment DESC" if sort_by == "sentiment" else "published DESC"
 
+    # Efficient deduplication directly in SQLite using a window function.
+    # `ROW_NUMBER() OVER (PARTITION BY lower(title) ORDER BY published DESC)`
+    # assigns rank 1 to the most-recent row of every case-insensitive title group.
+
     with get_db() as conn:
         rows = conn.execute(
             f"""
+            WITH ranked AS (
+                SELECT id, title, content, url, published, category, sentiment, reason, is_good, source_type,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY lower(title)
+                           ORDER BY published DESC
+                       ) AS rn
+                FROM articles
+                WHERE is_good = 1
+            )
             SELECT id, title, content, url, published, category, sentiment, reason, is_good, source_type
-            FROM articles
-            WHERE is_good = 1
+            FROM ranked
+            WHERE rn = 1
             ORDER BY {order_clause}
             LIMIT ?
             """,
             (limit,),
         ).fetchall()
+
     return rows 
