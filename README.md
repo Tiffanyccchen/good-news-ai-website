@@ -78,8 +78,7 @@ Once the application is running:
 
 *   **API Dependencies**: The application is entirely dependent on the availability and terms of service of the free NewsAPI and Groq APIs. The time and amount are limited. (See https://newsapi.org/pricing and https://console.groq.com/docs/rate-limits)
 *   **Subjectivity of "Good News"**: The classification of news is performed by an LLM and is inherently subjective. While the prompts are engineered to be specific, the model's judgment may not align with every user's definition of "good news."
-*   **NewsAPI Data Lag**: The free tier of NewsAPI may have a delay in delivering articles, so the news may not be up-to-the-minute. The pipeline accounts for a 24-hour delay.
-*   **Initial Run**: The first time the pipeline runs, it fetches a larger historical backlog of articles (one week). This initial run may take a few minutes to complete. Subsequent runs are much faster.
+*   **Initial Run**: The first time the pipeline runs, it fetches a larger historical backlog of articles (one week). This initial run may take a few minutes to complete. Subsequent runs are much faster. (But still subject to free-tier Grok TPM and RPM)
 
 ## 📊 Data Sources
 
@@ -120,6 +119,6 @@ The primary data source is the **NewsAPI** ([newsapi.org](https://newsapi.org)).
 
 ## Caveats / Todo
 
-* In the future, the 
+* Add more features in the website e.g. Comment section, Specify the type of good news you like for recommendation...
 * The user saved articles will only persisted for the current session. That's TBD.
 * For scaling up, a more sophisticated system design is needed. This is just a MVP to showcase the idea.

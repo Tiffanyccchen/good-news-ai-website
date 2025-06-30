@@ -22,7 +22,7 @@ def render_submission_form():
 
             if submitted:
                 if title and content:
-                    with st.spinner("Analyzing your submission..."):
+                    with st.spinner("Using LLM to check your submission..."):
                         judgement = asyncio.run(validate_user_submission(title, content))
 
                     if judgement and judgement.is_safe_and_good:
