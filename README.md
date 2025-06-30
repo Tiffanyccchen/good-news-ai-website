@@ -1,6 +1,8 @@
 # 🌞 Daily Good News
 
-**Team:** Created by Yu Ting Chen
+**Team:** Created by Yu Ting Chen  
+**Website:** https://good-news-ai-website.streamlit.app/  
+**Pitch Slide:** https://docs.google.com/presentation/d/17yUjOmcatGAodeA6htgfAfKJlvDFW3WzxmSWtqEoDv4/edit?usp=sharing   
 
 ## 📖 Project Description
 
@@ -21,18 +23,14 @@ Follow these steps to run the project locally.
 **1. Clone the Repository**
 
 ```bash
-git clone https://github.com/your-username/good-news.git
+git clone https://github.com/Tiffanyccchen/good-news-ai-website.git
 cd good-news
 ```
 
 **2. Create a Virtual Environment**
 
 It's recommended to use a virtual environment to manage dependencies.
-
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
-```
+We are using poetry here. Make sure to insteall poetry https://python-poetry.org/docs/basic-usage/ 
 
 **3. Install Dependencies**
 
@@ -77,14 +75,14 @@ Once the application is running:
 ## 📝 Assumptions & Limitations
 
 *   **API Dependencies**: The application is entirely dependent on the availability and terms of service of the free NewsAPI and Groq APIs. The time and amount are limited. (See https://newsapi.org/pricing and https://console.groq.com/docs/rate-limits)
-*   **Subjectivity of "Good News"**: The classification of news is performed by an LLM and is inherently subjective. While the prompts are engineered to be specific, the model's judgment may not align with every user's definition of "good news."
+*   **Subjectivity of "Good News"**: We try to be objective but knows the classification of news is performed by an LLM and is inherently subjective. While the prompts are engineered to be specific, the model's judgment may not align with every user's definition of "good news."
 *   **Initial Run**: The first time the pipeline runs, it fetches a larger historical backlog of articles (one week). This initial run may take a few minutes to complete. Subsequent runs are much faster. (But still subject to free-tier Grok TPM and RPM)
 
 ## 📊 Data Sources
 
 The primary data source is the **NewsAPI** ([newsapi.org](https://newsapi.org)). The application fetches articles from a pre-defined list of major, reputable news organizations to ensure data quality.
 
-## Architecture
+## Simplized Architecture
 
 ```
                ┌────────────┐
