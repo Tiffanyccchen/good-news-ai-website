@@ -135,7 +135,7 @@ async def _judge(article_title: str, article_content: str) -> NewsJudgement | No
     return None
 
 
-async def filter_good(batch_limit: int = 20, concurrency: int = 3) -> None:
+async def filter_good(batch_limit: int = 100, concurrency: int = 3) -> None:
     if not _get_client():
         return
 
