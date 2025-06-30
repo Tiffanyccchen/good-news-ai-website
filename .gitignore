@@ -1,0 +1,9 @@
+# Ignore local secrets and database files
+/.streamlit/secrets.toml
+.env
+**/**.ipynb
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd 
