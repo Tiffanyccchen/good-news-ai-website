@@ -88,11 +88,11 @@ The primary data source is the **NewsAPI** ([newsapi.org](https://newsapi.org)).
 
 ```
                ┌────────────┐
-               │  Scheduler │  (cron / HF refresh button)
+               │  Scheduler │  (cron )
                └─────┬──────┘
                      ▼
              ┌─────────────────┐
-             │  fetcher.py     │  ← RSS feeds / NewsAPI
+             │  fetcher.py     │  ← NewsAPI
              └─────────────────┘
                      ▼
              ┌─────────────────┐
@@ -100,7 +100,7 @@ The primary data source is the **NewsAPI** ([newsapi.org](https://newsapi.org)).
              └─────────────────┘
                      ▼
              ┌─────────────────┐
-             │ llm_filter.py   │  ← Groq (or other LLM)
+             │ llm_filter.py   │  ← Groq API (LLAMA3 8b & 72b)
              └─────────────────┘
                      ▼
              ┌─────────────────┐
