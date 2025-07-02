@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import os
 from typing import Literal
+from itertools import cycle  # for round-robin model selection
 
 import instructor
 from groq import AsyncGroq
@@ -18,6 +19,14 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 # Hold the patched client; initialise lazily to avoid import-time side-effects
 _client: AsyncGroq | None = None
+
+# Round-robin iterator over the models we want to alternate between
+_model_cycle = cycle([
+    "llama-3.3-70b-versatile", # higher-quality, larger
+    "llama-3.1-8b-instant", # cheaper / usually more available
+    "llama3-8b-8192",   # cheaper / usually more available
+    "llama3-70b-8192",  # higher-quality, larger
+])
 
 
 def _get_client() -> AsyncGroq | None:
@@ -85,53 +94,77 @@ async def validate_user_submission(title: str, content: str) -> SafetyJudgement 
 
 
 async def _judge(article_title: str, article_content: str) -> NewsJudgement | None:
-    """Uses instructor to get a validated Pydantic model from the LLM."""
+    """Classify an article using multiple LLMs with retry & fallback.
+
+    The function will attempt to use each model in ``models_to_try`` up to
+    ``max_retries`` times before falling back to the next model. If **all**
+    models fail, ``None`` is returned so that the caller can handle the
+    failure (e.g. mark the article as not-good to avoid infinite loops).
+    """
+
     if not _get_client():
         return None
 
+    models_to_try = [next(_model_cycle), next(_model_cycle)]   # current + immediate fallback
     max_retries = 3
     backoff_secs = 2
 
-    for attempt in range(1, max_retries + 1):
-        try:
-            judgement = await _get_client().chat.completions.create(
-                model="llama3-70b-8192",
-                response_model=NewsJudgement,
-                max_retries=2,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": """
-                        You are a news classification expert. Your task is to analyze an article and classify it based on the following criteria for "good news".
+    for model in models_to_try:
+        for attempt in range(1, max_retries + 1):
+            try:
+                judgement = await _get_client().chat.completions.create(
+                    model=model,
+                    response_model=NewsJudgement,
+                    max_retries=2,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": """
+                            You are a news classification expert. Your task is to analyze an article and classify it based on the following criteria for "good news".
 
-                        Classification Guide:
-                        - **"cute_or_fun"**: genuinely lighthearted, amusing, adorable, or delightfully silly items (e.g. an otter playing piano, a harmless viral meme, a car that honks emojis). The Generic lifestyle trends, celebrity outfits, brand promo, or listicles that read like ads does not count.
-                        - **"improvement"**: clear, evidence-based progress that benefits society, the planet, or knowledge (e.g. peer-reviewed medical breakthrough, major poverty drop, verified clean-energy milestone). Pure product marketing, One-off luxury launches does not count.
-                        - **heartwarming"**: authentic acts of kindness, courage, inclusion, or community generosity (e.g. strangers rescue a dog, huge donation saves a library, first Deaf pilot licensed). General tips and tricks, or articles that are not about a specific act of kindness, courage, inclusion, or community generosity does not count.
-                        - **"none"**: Use this category if the article is neutral, political, tragic, or does not fit any of the above. The `is_good_news` field must be `false` if the category is "none".
-                        """,
-                    },
-                    {
-                        "role": "user",
-                        "content": f"Please classify this article:\nTitle: {article_title}\n\nContent: {article_content}",
-                    },
-                ],
-            )
-            return judgement
+                            Classification Guide:
+                            - **"cute_or_fun"**: genuinely lighthearted, amusing, adorable, or delightfully silly items (e.g. an otter playing piano, a harmless viral meme, a car that honks emojis). The Generic lifestyle trends, celebrity outfits, brand promo, or listicles that read like ads does not count.
+                            - **"improvement"**: clear, evidence-based progress that benefits society, the planet, or knowledge (e.g. peer-reviewed medical breakthrough, major poverty drop, verified clean-energy milestone). Pure product marketing, One-off luxury launches does not count.
+                            - **heartwarming"**: authentic acts of kindness, courage, inclusion, or community generosity (e.g. strangers rescue a dog, huge donation saves a library, first Deaf pilot licensed). General tips and tricks, or articles that are not about a specific act of kindness, courage, inclusion, or community generosity does not count.
+                            - **"none"**: Use this category if the article is neutral, political, tragic, or does not fit any of the above. The `is_good_news` field must be `false` if the category is "none".
+                            """,
+                        },
+                        {
+                            "role": "user",
+                            "content": f"Please classify this article:\nTitle: {article_title}\n\nContent: {article_content}",
+                        },
+                    ],
+                )
+                return judgement
 
-        except Exception as e:
-            error_str = str(e)
-            # rudimentary 429 / rate limit detection
-            if "429" in error_str or "rate limit" in error_str.lower():
-                wait_for = backoff_secs * attempt
-                logger.warning("Groq rate-limited (429). Waiting %s s before retry %s/%s…", wait_for, attempt, max_retries)
-                await asyncio.sleep(wait_for)
-                continue  # retry outer loop
+            except Exception as e:
+                error_str = str(e)
 
-            logger.error("Error processing article with Groq/instructor: %r", e)
-            return None
+                # Handle rate limits with exponential back-off
+                if "429" in error_str or "rate limit" in error_str.lower():
+                    wait_for = backoff_secs * attempt
+                    logger.warning(
+                        "Groq rate-limited (429) on model %s. Waiting %s s before retry %s/%s…",
+                        model,
+                        wait_for,
+                        attempt,
+                        max_retries,
+                    )
+                    await asyncio.sleep(wait_for)
+                    continue
 
-    logger.error("Exceeded max retries (%s) for article: %s", max_retries, article_title)
+                logger.warning(
+                    "Model %s failed attempt %s/%s: %s",
+                    model,
+                    attempt,
+                    max_retries,
+                    error_str,
+                )
+
+                # Short pause before next retry to avoid hammering the API
+                await asyncio.sleep(0.5)
+
+    logger.error("All models failed for article: %s", article_title)
     return None
 
 
