@@ -28,7 +28,6 @@ _client: AsyncGroq | None = None
 MODEL_POOL: list[str] = [
     "llama-3.3-70b-versatile",  # higher-quality, larger context
     "llama-3.1-8b-instant",     # cheaper / faster
-    "llama3-70b-8192",          # older 70-B variant
     "llama3-8b-8192",           # older 8-B variant
 ]
 
@@ -90,7 +89,7 @@ async def validate_user_submission(title: str, content: str) -> SafetyJudgement 
                 },
                 {
                     "role": "user",
-                    "content": f"Please moderate this submission:\nTitle: {title}\n\nStory: {content}",
+                    "content": f"Please moderate this submission:\nTitle: {title}\n\nStory: {content[:500]}",
                 },
             ],
         )
@@ -153,7 +152,7 @@ async def _judge(article_title: str, article_content: str) -> NewsJudgement | No
                 err = str(e)
 
                 # 429 → immediately skip to next model
-                if "429" in err or "rate limit" in err.lower():
+                if "429" in err or "rate-limited" in err.lower():
                     logger.warning(
                         "Groq rate-limited (429) on %s during attempt %s. Switching to next model immediately.",
                         model,
