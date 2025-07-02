@@ -115,7 +115,9 @@ async def _judge(article_title: str, article_content: str) -> NewsJudgement | No
     # Build a list of models for *this* article: start with the current cycle
     # position and include each model exactly once so we attempt every model at
     # most once.
-    models_to_try: list[str] = [next(_model_cycle) for _ in range(len(MODEL_POOL))]
+    start_model = next(_model_cycle)                 # advances by ONE
+    start_idx   = MODEL_POOL.index(start_model)
+    models_to_try = MODEL_POOL[start_idx:] + MODEL_POOL[:start_idx]
 
     max_retries = 3
 
@@ -141,7 +143,7 @@ async def _judge(article_title: str, article_content: str) -> NewsJudgement | No
                         },
                         {
                             "role": "user",
-                            "content": f"Please classify this article:\nTitle: {article_title}\n\nContent: {article_content}",
+                            "content": f"Please classify this article:\nTitle: {article_title}\n\nContent: {article_content[:1000]}",
                         },
                     ],
                 )
