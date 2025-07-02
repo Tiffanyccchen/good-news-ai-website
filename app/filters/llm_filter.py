@@ -20,13 +20,20 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 # Hold the patched client; initialise lazily to avoid import-time side-effects
 _client: AsyncGroq | None = None
 
-# Round-robin iterator over the models we want to alternate between
-_model_cycle = cycle([
-    "llama-3.3-70b-versatile", # higher-quality, larger
-    "llama-3.1-8b-instant", # cheaper / usually more available
-    "llama3-8b-8192",   # cheaper / usually more available
-    "llama3-70b-8192",  # higher-quality, larger
-])
+# Ordered list of models to use. The list itself never changes; we only
+# advance a *cycle* pointer so that successive articles start with the next
+# model (balanced traffic), while still giving each article a chance to
+# fallback through the full list on errors.
+
+MODEL_POOL: list[str] = [
+    "llama-3.3-70b-versatile",  # higher-quality, larger context
+    "llama-3.1-8b-instant",     # cheaper / faster
+    "llama3-70b-8192",          # older 70-B variant
+    "llama3-8b-8192",           # older 8-B variant
+]
+
+# Round-robin iterator over MODEL_POOL
+_model_cycle = cycle(MODEL_POOL)
 
 
 def _get_client() -> AsyncGroq | None:
@@ -105,9 +112,12 @@ async def _judge(article_title: str, article_content: str) -> NewsJudgement | No
     if not _get_client():
         return None
 
-    models_to_try = [next(_model_cycle), next(_model_cycle)]   # current + immediate fallback
+    # Build a list of models for *this* article: start with the current cycle
+    # position and include each model exactly once so we attempt every model at
+    # most once.
+    models_to_try: list[str] = [next(_model_cycle) for _ in range(len(MODEL_POOL))]
+
     max_retries = 3
-    backoff_secs = 2
 
     for model in models_to_try:
         for attempt in range(1, max_retries + 1):
@@ -126,7 +136,7 @@ async def _judge(article_title: str, article_content: str) -> NewsJudgement | No
                             - **"cute_or_fun"**: genuinely lighthearted, amusing, adorable, or delightfully silly items (e.g. an otter playing piano, a harmless viral meme, a car that honks emojis). The Generic lifestyle trends, celebrity outfits, brand promo, or listicles that read like ads does not count.
                             - **"improvement"**: clear, evidence-based progress that benefits society, the planet, or knowledge (e.g. peer-reviewed medical breakthrough, major poverty drop, verified clean-energy milestone). Pure product marketing, One-off luxury launches does not count.
                             - **heartwarming"**: authentic acts of kindness, courage, inclusion, or community generosity (e.g. strangers rescue a dog, huge donation saves a library, first Deaf pilot licensed). General tips and tricks, or articles that are not about a specific act of kindness, courage, inclusion, or community generosity does not count.
-                            - **"none"**: Use this category if the article is neutral, political, tragic, or does not fit any of the above. The `is_good_news` field must be `false` if the category is "none".
+                            - **"none"**: neutral, political or tragic. `is_good_news` must be false if category is "none".
                             """,
                         },
                         {
@@ -135,40 +145,33 @@ async def _judge(article_title: str, article_content: str) -> NewsJudgement | No
                         },
                     ],
                 )
-                return judgement
+                return judgement  # success!
 
             except Exception as e:
-                error_str = str(e)
+                err = str(e)
 
-                # Handle rate limits with exponential back-off
-                if "429" in error_str or "rate limit" in error_str.lower():
-                    wait_for = backoff_secs * attempt
+                # 429 → immediately skip to next model
+                if "429" in err or "rate limit" in err.lower():
                     logger.warning(
-                        "Groq rate-limited (429) on model %s. Waiting %s s before retry %s/%s…",
+                        "Groq rate-limited (429) on %s during attempt %s. Switching to next model immediately.",
                         model,
-                        wait_for,
                         attempt,
-                        max_retries,
                     )
-                    await asyncio.sleep(wait_for)
-                    continue
+                    break  # stop retrying this model; move to next one
 
-                logger.warning(
-                    "Model %s failed attempt %s/%s: %s",
-                    model,
-                    attempt,
-                    max_retries,
-                    error_str,
-                )
+                # Any other error → give up on this model, move to next one
+                logger.warning("Model %s failed attempt %s/%s: %s", model, attempt, max_retries, err)
+                break  # go to next model in list
 
-                # Short pause before next retry to avoid hammering the API
-                await asyncio.sleep(0.5)
+        # exhausted retries for this model
+        logger.info("Model %s exhausted retries. Trying next model if available…", model)
 
+    # All models exhausted for this article
     logger.error("All models failed for article: %s", article_title)
     return None
 
 
-async def filter_good(batch_limit: int = 100, concurrency: int = 3) -> None:
+async def filter_good(batch_limit: int = 100, concurrency: int = 1) -> None:
     if not _get_client():
         return
 
@@ -211,7 +214,7 @@ async def filter_good(batch_limit: int = 100, concurrency: int = 3) -> None:
                     logger.warning("Failed to get judgement for article '%s'. Marked as not good.", title)
 
             # Gentle sleep to respect Groq rate limits
-            await asyncio.sleep(0.4)
+            await asyncio.sleep(1)
 
     await tqdm_asyncio.gather(*[_task(r) for r in rows])
     logger.info("Finished LLM classification for %s articles.", len(rows)) 
