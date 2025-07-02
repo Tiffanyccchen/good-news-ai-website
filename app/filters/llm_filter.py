@@ -123,6 +123,7 @@ async def _judge(article_title: str, article_content: str) -> NewsJudgement | No
     for model in models_to_try:
         for attempt in range(1, max_retries + 1):
             try:
+                logger.info("Attempting to classify with model: %s (attempt %s/%s)", model, attempt, max_retries)
                 judgement = await _get_client().chat.completions.create(
                     model=model,
                     response_model=NewsJudgement,
